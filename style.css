@@ -13,12 +13,54 @@ body {
     padding: 28px 24px;
     border-radius: 16px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+    position: relative;
+}
+
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    position: relative;
 }
 
 h1 {
     font-size: 22px;
-    margin-bottom: 24px;
+    margin: 0;
     color: #2c3e50;
+}
+
+.cloud-status {
+    font-size: 14px;
+    transition: color 0.3s;
+}
+
+.cloud-status.connected {
+    color: #2ecc71;
+}
+
+.cloud-status.disconnected {
+    color: #e74c3c;
+}
+
+.user-config {
+    margin-bottom: 20px;
+}
+
+#user-name {
+    width: 100%;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+#user-name:focus {
+    border-color: #3498db;
 }
 
 /* 周视图 */
@@ -45,13 +87,32 @@ h1 {
     border-color: #ffb74d;
 }
 
+.day-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 60px;
+    flex-shrink: 0;
+}
+
 .day-label {
-    width: 56px;
     font-size: 14px;
     font-weight: 600;
     color: #555;
-    flex-shrink: 0;
     text-align: left;
+}
+
+.user-badge {
+    font-size: 10px;
+    color: #999;
+    background: #eee;
+    padding: 1px 4px;
+    border-radius: 4px;
+    max-width: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .day-row.today .day-label {
@@ -131,6 +192,20 @@ h1 {
     white-space: nowrap;
 }
 
-.btn-secondary:hover {
-    background: #e0e0e0;
+.day-row.readonly {
+    opacity: 0.7;
+}
+
+.day-select:disabled, 
+.btn-random-day:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled {
+    cursor: not-allowed;
+    background: #f0f0f0;
+    color: #ccc;
+    border-color: #eee;
+}
+
+.btn-primary:disabled {
+    background: #aed6f1;
 }
