@@ -9,13 +9,13 @@
 <body>
 
 <div class="container">
-    <h1>🍽️ 今天吃什么？</h1>
-    <div id="result">点击下方按钮抽取</div>
-    <button onclick="pickFood()">帮我选一个</button>
+    <h1>🍽️ 本周吃什么？</h1>
 
-    <div class="history">
-        <strong>最近吃过（最近5次不重复）：</strong>
-        <div id="history-list" style="margin-top: 8px;">暂无记录</div>
+    <div class="week-grid" id="week-grid"></div>
+
+    <div class="actions">
+        <button class="btn-primary" onclick="pickToday()">随机今天</button>
+        <button class="btn-secondary" onclick="newWeek()">新的一周</button>
     </div>
 </div>
 

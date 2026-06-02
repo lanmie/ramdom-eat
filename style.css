@@ -1,10 +1,136 @@
-body { font-family: 'PingFang SC', sans-serif; text-align: center; background: #f5f7fa; padding: 50px 20px; color: #333; }
-.container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
-#result { font-size: 36px; font-weight: bold; color: #e74c3c; margin: 30px 0; min-height: 54px; }
-button { background: #3498db; color: white; border: none; padding: 12px 30px; font-size: 18px; border-radius: 25px; cursor: pointer; transition: 0.2s; width: 100%; }
-button:hover { background: #2980b9; }
-.history { margin-top: 30px; text-align: left; font-size: 14px; color: #7f8c8d; border-top: 1px dashed #ddd; padding-top: 15px; }
-.history-item { display: inline-flex; align-items: center; background: #edf2f7; padding: 4px 10px; border-radius: 12px; margin: 4px; gap: 6px; }
-.history-item .delete-btn { cursor: pointer; color: #aaa; font-size: 12px; line-height: 1; }
-.history-item .delete-btn:hover { color: #e74c3c; }
+body {
+    font-family: 'PingFang SC', sans-serif;
+    text-align: center;
+    background: #f5f7fa;
+    padding: 40px 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 420px;
+    margin: 0 auto;
+    background: white;
+    padding: 28px 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+}
+
+h1 {
+    font-size: 22px;
+    margin-bottom: 24px;
+    color: #2c3e50;
+}
+
+/* 周视图 */
+.week-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.day-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: #f8f9fa;
+    border: 1.5px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.day-row.today {
+    background: #fff8f0;
+    border-color: #ffb74d;
+}
+
+.day-label {
+    width: 56px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    flex-shrink: 0;
+    text-align: left;
+}
+
+.day-row.today .day-label {
+    color: #e67e22;
+}
+
+.day-select {
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 14px;
+    background: white;
+    color: #aaa;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.day-select:focus {
+    border-color: #3498db;
+}
+
+.day-select.selected {
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.btn-random-day {
+    background: none;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-random-day:hover {
+    background: #edf2f7;
+    border-color: #bbb;
+}
+
+/* 底部操作区 */
+.actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.btn-primary {
+    flex: 1;
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 13px;
+    font-size: 16px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: #2980b9;
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #666;
+    border: none;
+    padding: 13px 20px;
+    font-size: 14px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
