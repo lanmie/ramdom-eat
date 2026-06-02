@@ -1,0 +1,10 @@
+body { font-family: 'PingFang SC', sans-serif; text-align: center; background: #f5f7fa; padding: 50px 20px; color: #333; }
+.container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
+#result { font-size: 36px; font-weight: bold; color: #e74c3c; margin: 30px 0; min-height: 54px; }
+button { background: #3498db; color: white; border: none; padding: 12px 30px; font-size: 18px; border-radius: 25px; cursor: pointer; transition: 0.2s; width: 100%; }
+button:hover { background: #2980b9; }
+.history { margin-top: 30px; text-align: left; font-size: 14px; color: #7f8c8d; border-top: 1px dashed #ddd; padding-top: 15px; }
+.history-item { display: inline-flex; align-items: center; background: #edf2f7; padding: 4px 10px; border-radius: 12px; margin: 4px; gap: 6px; }
+.history-item .delete-btn { cursor: pointer; color: #aaa; font-size: 12px; line-height: 1; }
+.history-item .delete-btn:hover { color: #e74c3c; }
