@@ -142,11 +142,19 @@ async function saveMenuToCloud() {
     }
 }
 
+// 格式化本地日期为 YYYY-MM-DD，避免时区偏移
+function toLocalDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // 修改：根据本周一的日期获取数据
 async function fetchCloudData() {
     if (!isCloudConnected || !supabaseClient) return;
 
-    const mondayStr = getThisMonday().toISOString().split('T')[0];
+    const mondayStr = toLocalDateString(getThisMonday());
 
     try {
         const { data, error } = await supabaseClient
@@ -190,7 +198,7 @@ async function fetchCloudData() {
 async function saveToCloud() {
     if (!isCloudConnected || !supabaseClient) return;
 
-    const mondayStr = getThisMonday().toISOString().split('T')[0];
+    const mondayStr = toLocalDateString(getThisMonday());
 
     try {
         let result;
@@ -304,14 +312,23 @@ function switchTab(tabName) {
     if (tabName === 'menu') renderMenuEditor();
 }
 
-// 历史记录中的日期范围工具
-function getWeekRangeString(dateStr) {
-    const date = new Date(dateStr);
+// 获取某日期所在周的周一
+function getMondayOfDate(dateInput) {
+    const date = new Date(dateInput);
     const day = date.getDay() || 7;
     const monday = new Date(date);
     monday.setDate(date.getDate() - (day - 1));
-    const friday = new Date(date);
-    friday.setDate(date.getDate() + (4)); // 这里改为+4，因为周五是周一+4天
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+}
+
+// 历史记录中的日期范围工具
+function getWeekRangeString(dateStr, weekMonday) {
+    // 优先使用数据库里存的 week_monday，如果没有（旧数据），则实时推算
+    const monday = weekMonday ? new Date(weekMonday) : getMondayOfDate(dateStr);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    
     const format = (d) => `${d.getMonth() + 1}月${d.getDate()}日`;
     return `${format(monday)} - ${format(friday)}`;
 }
@@ -325,7 +342,9 @@ async function loadHistory() {
         const { data, error } = await supabaseClient
             .from('week_plans')
             .select('*')
-            .order('week_monday', { ascending: false }); // 改为按周一日期排序
+            // 优先按 week_monday 排序，如果没有则按创建时间
+            .order('week_monday', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
         if (!data || data.length === 0) {
@@ -337,10 +356,12 @@ async function loadHistory() {
         const stats = {};
 
         data.forEach(record => {
-            const dateObj = new Date(record.week_monday || record.created_at);
-            const monthKey = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月`;
+            // 统一使用周一日期作为分组和显示的基准
+            const mondayDate = record.week_monday ? new Date(record.week_monday) : getMondayOfDate(record.created_at);
+            const monthKey = `${mondayDate.getFullYear()}年${mondayDate.getMonth() + 1}月`;
+            
             if (!months[monthKey]) months[monthKey] = [];
-            months[monthKey].push(record);
+            months[monthKey].push({ ...record, calculated_monday: mondayDate });
 
             Object.values(record.data).forEach(entry => {
                 if (entry && entry.id && menu[entry.id]) {
@@ -352,10 +373,7 @@ async function loadHistory() {
 
         listEl.innerHTML = Object.entries(months).map(([month, records]) => {
             const recordHtml = records.map(record => {
-                const monday = new Date(record.week_monday || record.created_at);
-                const friday = new Date(monday);
-                friday.setDate(monday.getDate() + 4);
-                const range = `${monday.getMonth() + 1}月${monday.getDate()}日 - ${friday.getMonth() + 1}月${friday.getDate()}日`;
+                const range = getWeekRangeString(record.created_at, record.week_monday);
                 
                 const details = Object.entries(dayNames).map(([idx, name]) => {
                     const entry = record.data[idx];
@@ -367,7 +385,7 @@ async function loadHistory() {
                     <div class="history-item">
                         <div class="history-date">
                             <span style="font-weight: bold; color: #2c3e50;">${range}</span>
-                            <span style="font-size: 10px; opacity: 0.6">${new Date(record.created_at).toLocaleDateString()}</span>
+                            <span style="font-size: 10px; opacity: 0.6">同步于: ${new Date(record.created_at).toLocaleDateString()}</span>
                         </div>
                         <div class="history-details">${details || '<div class="no-data" style="padding:0">本周暂无记录</div>'}</div>
                     </div>
