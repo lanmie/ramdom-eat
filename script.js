@@ -491,12 +491,15 @@ function renderWeek() {
 // 初始化
 updateStatusUI(isCloudConnected);
 renderWeek();
+
 if (isCloudConnected) {
-    fetchMenuData(); // 先加载菜单
-    fetchCloudData();
-    // 每 30 秒自动同步一次
-    setInterval(() => {
-        fetchMenuData();
-        fetchCloudData();
-    }, 30000);
+    // 立即执行一次
+    (async () => {
+        await fetchMenuData();
+        await fetchCloudData();
+    })();
+    
+    // 每 15 秒同步一次菜单，30 秒同步一次周计划（菜单更新频率可以稍微快一点）
+    setInterval(fetchMenuData, 15000);
+    setInterval(fetchCloudData, 30000);
 }
