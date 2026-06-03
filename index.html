@@ -12,9 +12,10 @@
 
 <div class="container">
     <div class="header">
-        <h1>🍽️ 本周吃什么？</h1>
+        <h1>🍽️ <span id="week-title">本周</span>吃什么？</h1>
         <div id="cloud-status" class="cloud-status disconnected" title="未连接云端">●</div>
     </div>
+    <div id="week-range-display" class="week-range-display">正在计算日期...</div>
 
     <div class="user-config">
         <input type="text" id="user-name" placeholder="输入你的名字..." onchange="saveUserName(this.value)">
@@ -24,7 +25,7 @@
 
     <div class="actions">
         <button class="btn-primary" onclick="pickToday()">随机今天</button>
-        <button class="btn-secondary" onclick="newWeek()">新的一周</button>
+        <button class="btn-secondary" onclick="newWeek()">重置本周</button>
         <button class="btn-history" onclick="toggleHistory()">📅 历史记录</button>
     </div>
 </div>
