@@ -230,6 +230,7 @@ async function saveToCloud() {
     }
 }
 
+// 手动选择某天的食物
 async function saveDay(dayIndex, value) {
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
@@ -237,11 +238,17 @@ async function saveDay(dayIndex, value) {
         return;
     }
     const foodId = value ? parseInt(value) : null;
-    weekData[dayIndex] = foodId ? { id: foodId, user: userName } : null;
+    // 关键改进：存储时同时保存 ID、名称和用户，确保历史记录不受菜单删除影响
+    weekData[dayIndex] = foodId ? { 
+        id: foodId, 
+        name: menu[foodId], 
+        user: userName 
+    } : null;
     renderWeek();
     await saveToCloud();
 }
 
+// 随机某天
 async function randomDay(dayIndex) {
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
@@ -261,7 +268,12 @@ async function randomDay(dayIndex) {
     }
 
     const selectedId = available[Math.floor(Math.random() * available.length)];
-    weekData[dayIndex] = { id: selectedId, user: userName };
+    // 关键改进：存储时同时保存名称
+    weekData[dayIndex] = { 
+        id: selectedId, 
+        name: menu[selectedId], 
+        user: userName 
+    };
     renderWeek();
     await saveToCloud();
 }
@@ -363,9 +375,10 @@ async function loadHistory() {
             if (!months[monthKey]) months[monthKey] = [];
             months[monthKey].push({ ...record, calculated_monday: mondayDate });
 
+            // 统计逻辑
             Object.values(record.data).forEach(entry => {
-                if (entry && entry.id && menu[entry.id]) {
-                    const foodName = menu[entry.id];
+                if (entry) {
+                    const foodName = entry.name || (entry.id && menu[entry.id]) || "未知食物";
                     stats[foodName] = (stats[foodName] || 0) + 1;
                 }
             });
@@ -377,8 +390,10 @@ async function loadHistory() {
                 
                 const details = Object.entries(dayNames).map(([idx, name]) => {
                     const entry = record.data[idx];
-                    if (!entry || !menu[entry.id]) return '';
-                    return `<div class="history-day">${name}<b>${menu[entry.id]}</b></div>`;
+                    if (!entry) return '';
+                    // 即使菜单里删了，也能从记录里读出名字
+                    const foodName = entry.name || (entry.id && menu[entry.id]) || "未知";
+                    return `<div class="history-day">${name}<b>${foodName}</b></div>`;
                 }).filter(h => h).join('');
 
                 return `
@@ -454,12 +469,25 @@ function renderWeek() {
         const user = entry ? entry.user : '';
         const isToday = idx === today;
         const options = `<option value="">— 未选择 —</option>` +
-            Object.entries(menu).map(([id, name]) => `<option value="${id}" ${selectedId == id ? 'selected' : ''}>${name}</option>`).join('');
+            Object.entries(menu).map(([id, name]) => 
+                `<option value="${id}" ${selectedId == id ? 'selected' : ''}>${name}</option>`
+            ).join('');
+
+        // 如果当前选中的食物已经不在菜单里了，我们需要额外添加一个选项，防止显示空白
+        let extraOption = '';
+        if (entry && entry.name && !Object.values(menu).includes(entry.name)) {
+            extraOption = `<option value="${entry.id}" selected>${entry.name} (已下架)</option>`;
+        }
 
         return `
             <div class="day-row ${isToday ? 'today' : ''} ${!isAuth ? 'readonly' : ''}">
-                <div class="day-info"><span class="day-label">${dayName}${isToday ? ' 📍' : ''}</span>${user ? `<span class="user-badge" title="选择者">${user}</span>` : ''}</div>
-                <select class="day-select ${selectedId ? 'selected' : ''}" onchange="saveDay(${idx}, this.value)" ${!isAuth ? 'disabled' : ''}>${options}</select>
+                <div class="day-info">
+                    <span class="day-label">${dayName}${isToday ? ' 📍' : ''}</span>
+                    ${user ? `<span class="user-badge" title="选择者">${user}</span>` : ''}
+                </div>
+                <select class="day-select ${selectedId ? 'selected' : ''}" onchange="saveDay(${idx}, this.value)" ${!isAuth ? 'disabled' : ''}>
+                    ${extraOption}${options}
+                </select>
                 <button class="btn-random-day" onclick="randomDay(${idx})" title="随机" ${!isAuth ? 'disabled' : ''}>🎲</button>
             </div>
         `;
