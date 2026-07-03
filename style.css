@@ -518,3 +518,39 @@ h1 {
 .btn-primary:disabled {
     background: #aed6f1;
 }
+
+/* 奶茶按钮样式 */
+.btn-milk-tea {
+    background: none;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    opacity: 0.4;
+}
+
+.btn-milk-tea:hover {
+    background: #fff9e6;
+    border-color: #f39c12;
+    opacity: 0.8;
+}
+
+.btn-milk-tea.active {
+    background: #fff3cd;
+    border-color: #f39c12;
+    opacity: 1;
+}
+
+.btn-milk-tea.active:hover {
+    background: #ffe69c;
+}
+
+.btn-milk-tea:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+    background: #f0f0f0;
+    border-color: #eee;
+}

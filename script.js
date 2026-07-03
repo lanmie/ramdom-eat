@@ -37,11 +37,11 @@ let menu = JSON.parse(localStorage.getItem('menuData')) || {
     7: "子固路"
 };
 
-const dayNames = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五' };
+const dayNames = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六' };
 const ALLOWED_USERS = ['gina', 'pin'];
 
 // 周数据
-let weekData = JSON.parse(localStorage.getItem('weekData')) || { 1: null, 2: null, 3: null, 4: null, 5: null };
+let weekData = JSON.parse(localStorage.getItem('weekData')) || { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
 let currentRecordId = localStorage.getItem('currentRecordId') || null;
 let userName = localStorage.getItem('userName') || '';
 
@@ -57,13 +57,13 @@ function getThisMonday() {
     return monday;
 }
 
-// 获取本周五的日期对象
-function getThisFriday() {
+// 获取本周六的日期对象
+function getThisSaturday() {
     const monday = getThisMonday();
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-    friday.setHours(23, 59, 59, 999);
-    return friday;
+    const saturday = new Date(monday);
+    saturday.setDate(monday.getDate() + 5);
+    saturday.setHours(23, 59, 59, 999);
+    return saturday;
 }
 
 // 格式化日期：M月D日
@@ -74,10 +74,10 @@ function formatDate(date) {
 // 更新日期范围显示
 function updateDateDisplay() {
     const monday = getThisMonday();
-    const friday = getThisFriday();
+    const saturday = getThisSaturday();
     const displayEl = document.getElementById('week-range-display');
     if (displayEl) {
-        displayEl.innerText = `${formatDate(monday)} - ${formatDate(friday)}`;
+        displayEl.innerText = `${formatDate(monday)} - ${formatDate(saturday)}`;
     }
 }
 
@@ -85,7 +85,7 @@ function updateDateDisplay() {
 
 function getTodayIndex() {
     const d = new Date().getDay();
-    return (d >= 1 && d <= 5) ? d : null;
+    return (d >= 1 && d <= 6) ? d : null;
 }
 
 function isUserAuthorized() {
@@ -183,7 +183,7 @@ async function fetchCloudData() {
             // 如果本周确实没记录，且当前 ID 是旧的，才清空
             if (currentRecordId) {
                 console.log('检测到新的一周，正在切换到空白计划');
-                weekData = { 1: null, 2: null, 3: null, 4: null, 5: null };
+                weekData = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
                 currentRecordId = null;
                 localStorage.removeItem('currentRecordId');
                 renderWeek();
@@ -230,6 +230,22 @@ async function saveToCloud() {
     }
 }
 
+// 切换奶茶状态
+async function toggleMilkTea(dayIndex) {
+    if (!isUserAuthorized()) {
+        alert('抱歉，只有指定用户可以操作！');
+        renderWeek();
+        return;
+    }
+    if (!weekData[dayIndex]) {
+        weekData[dayIndex] = { id: null, name: null, user: null, hasMilkTea: true };
+    } else {
+        weekData[dayIndex].hasMilkTea = !weekData[dayIndex].hasMilkTea;
+    }
+    renderWeek();
+    await saveToCloud();
+}
+
 // 手动选择某天的食物
 async function saveDay(dayIndex, value) {
     if (!isUserAuthorized()) {
@@ -238,12 +254,15 @@ async function saveDay(dayIndex, value) {
         return;
     }
     const foodId = value ? parseInt(value) : null;
-    // 关键改进：存储时同时保存 ID、名称和用户，确保历史记录不受菜单删除影响
+    const existingMilkTea = weekData[dayIndex]?.hasMilkTea || false;
+    const existingUser = weekData[dayIndex]?.user || null;
+    // 关键改进：存储时同时保存 ID、名称、用户和奶茶状态
     weekData[dayIndex] = foodId ? { 
         id: foodId, 
         name: menu[foodId], 
-        user: userName 
-    } : null;
+        user: userName || existingUser,
+        hasMilkTea: existingMilkTea
+    } : (existingMilkTea ? { id: null, name: null, user: existingUser, hasMilkTea: true } : null);
     renderWeek();
     await saveToCloud();
 }
@@ -268,11 +287,13 @@ async function randomDay(dayIndex) {
     }
 
     const selectedId = available[Math.floor(Math.random() * available.length)];
-    // 关键改进：存储时同时保存名称
+    const existingMilkTea = weekData[dayIndex]?.hasMilkTea || false;
+    // 关键改进：存储时同时保存名称和奶茶状态
     weekData[dayIndex] = { 
         id: selectedId, 
         name: menu[selectedId], 
-        user: userName 
+        user: userName,
+        hasMilkTea: existingMilkTea
     };
     renderWeek();
     await saveToCloud();
@@ -285,7 +306,7 @@ function pickToday() {
     }
     const today = getTodayIndex();
     if (!today) {
-        alert('今天是周末，好好休息！🎉');
+        alert('今天是周日，好好休息！🎉');
         return;
     }
     randomDay(today);
@@ -298,7 +319,7 @@ async function newWeek() {
         return;
     }
     if (!confirm('确认清空本周所有记录并重新开始？')) return;
-    weekData = { 1: null, 2: null, 3: null, 4: null, 5: null };
+    weekData = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
     renderWeek();
     await saveToCloud();
 }
@@ -338,11 +359,11 @@ function getMondayOfDate(dateInput) {
 function getWeekRangeString(dateStr, weekMonday) {
     // 优先使用数据库里存的 week_monday，如果没有（旧数据），则实时推算
     const monday = weekMonday ? new Date(weekMonday) : getMondayOfDate(dateStr);
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
+    const saturday = new Date(monday);
+    saturday.setDate(monday.getDate() + 5);
     
     const format = (d) => `${d.getMonth() + 1}月${d.getDate()}日`;
-    return `${format(monday)} - ${format(friday)}`;
+    return `${format(monday)} - ${format(saturday)}`;
 }
 
 async function loadHistory() {
@@ -393,7 +414,8 @@ async function loadHistory() {
                     if (!entry) return '';
                     // 即使菜单里删了，也能从记录里读出名字
                     const foodName = entry.name || (entry.id && menu[entry.id]) || "未知";
-                    return `<div class="history-day">${name}<b>${foodName}</b></div>`;
+                    const milkTeaEmoji = entry.hasMilkTea ? ' 🧋' : '';
+                    return `<div class="history-day">${name}<b>${foodName}${milkTeaEmoji}</b></div>`;
                 }).filter(h => h).join('');
 
                 return `
@@ -467,6 +489,7 @@ function renderWeek() {
         const entry = weekData[idx];
         const selectedId = entry ? entry.id : null;
         const user = entry ? entry.user : '';
+        const hasMilkTea = entry ? entry.hasMilkTea : false;
         const isToday = idx === today;
         const options = `<option value="">— 未选择 —</option>` +
             Object.entries(menu).map(([id, name]) => 
@@ -489,6 +512,7 @@ function renderWeek() {
                     ${extraOption}${options}
                 </select>
                 <button class="btn-random-day" onclick="randomDay(${idx})" title="随机" ${!isAuth ? 'disabled' : ''}>🎲</button>
+                <button class="btn-milk-tea ${hasMilkTea ? 'active' : ''}" onclick="toggleMilkTea(${idx})" title="${hasMilkTea ? '已喝奶茶' : '喝奶茶了吗？'}" ${!isAuth ? 'disabled' : ''}>🧋</button>
             </div>
         `;
     }).join('');
