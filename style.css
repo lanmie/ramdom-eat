@@ -130,27 +130,95 @@ h1 {
     color: #e67e22;
 }
 
-.day-select {
+.day-select-wrapper {
     flex: 1;
+}
+
+.custom-select-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.custom-select-input {
+    width: 100%;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 7px 10px;
+    padding: 7px 35px 7px 10px;
     font-size: 14px;
     background: white;
-    color: #aaa;
-    outline: none;
-    cursor: pointer;
-    transition: border-color 0.2s;
-}
-
-.day-select:focus {
-    border-color: #3498db;
-}
-
-.day-select.selected {
     color: #2c3e50;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.custom-select-input::placeholder {
+    color: #aaa;
+}
+
+.custom-select-input:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.custom-select-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #aaa;
+    font-size: 10px;
+    pointer-events: none;
+    cursor: pointer;
+    pointer-events: auto;
+    user-select: none;
+    transition: transform 0.2s;
+}
+
+.custom-select-wrapper:has(.custom-select-input:focus) .custom-select-arrow,
+.custom-select-wrapper:has(.custom-select-dropdown.open) .custom-select-arrow {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.custom-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.custom-select-dropdown.open {
+    display: block;
+}
+
+.custom-select-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #2c3e50;
+    transition: background 0.15s;
+}
+
+.custom-select-option:hover {
+    background: #f0f7ff;
+}
+
+.custom-select-option.selected {
+    background: #eaf5ff;
+    color: #3498db;
     font-weight: 500;
 }
+
+
 
 .btn-random-day {
     background: none;

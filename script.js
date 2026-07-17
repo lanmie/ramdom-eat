@@ -246,26 +246,7 @@ async function toggleMilkTea(dayIndex) {
     await saveToCloud();
 }
 
-// 手动选择某天的食物
-async function saveDay(dayIndex, value) {
-    if (!isUserAuthorized()) {
-        alert('抱歉，只有指定用户可以操作！');
-        renderWeek();
-        return;
-    }
-    const foodId = value ? parseInt(value) : null;
-    const existingMilkTea = weekData[dayIndex]?.hasMilkTea || false;
-    const existingUser = weekData[dayIndex]?.user || null;
-    // 关键改进：存储时同时保存 ID、名称、用户和奶茶状态
-    weekData[dayIndex] = foodId ? { 
-        id: foodId, 
-        name: menu[foodId], 
-        user: userName || existingUser,
-        hasMilkTea: existingMilkTea
-    } : (existingMilkTea ? { id: null, name: null, user: existingUser, hasMilkTea: true } : null);
-    renderWeek();
-    await saveToCloud();
-}
+// 兼容旧代码，实际使用新的 saveInputValue
 
 // 随机某天
 async function randomDay(dayIndex) {
@@ -415,7 +396,8 @@ async function loadHistory() {
                     // 即使菜单里删了，也能从记录里读出名字
                     const foodName = entry.name || (entry.id && menu[entry.id]) || "未知";
                     const milkTeaEmoji = entry.hasMilkTea ? ' 🧋' : '';
-                    return `<div class="history-day">${name}<b>${foodName}${milkTeaEmoji}</b></div>`;
+                    const customLabel = entry.id === null ? ' ✏️' : '';
+                    return `<div class="history-day">${name}<b>${foodName}${milkTeaEmoji}${customLabel}</b></div>`;
                 }).filter(h => h).join('');
 
                 return `
@@ -488,29 +470,37 @@ function renderWeek() {
         const idx = parseInt(dayIndex);
         const entry = weekData[idx];
         const selectedId = entry ? entry.id : null;
+        const selectedName = entry ? entry.name : '';
         const user = entry ? entry.user : '';
         const hasMilkTea = entry ? entry.hasMilkTea : false;
+        const isCustom = entry && entry.id === null && entry.name;
         const isToday = idx === today;
-        const options = `<option value="">— 未选择 —</option>` +
-            Object.entries(menu).map(([id, name]) => 
-                `<option value="${id}" ${selectedId == id ? 'selected' : ''}>${name}</option>`
-            ).join('');
-
-        // 如果当前选中的食物已经不在菜单里了，我们需要额外添加一个选项，防止显示空白
-        let extraOption = '';
-        if (entry && entry.name && !Object.values(menu).includes(entry.name)) {
-            extraOption = `<option value="${entry.id}" selected>${entry.name} (已下架)</option>`;
-        }
-
+        
         return `
-            <div class="day-row ${isToday ? 'today' : ''} ${!isAuth ? 'readonly' : ''}">
+            <div class="day-row ${isToday ? 'today' : ''} ${!isAuth ? 'readonly' : ''}" data-day="${idx}">
                 <div class="day-info">
                     <span class="day-label">${dayName}${isToday ? ' 📍' : ''}</span>
                     ${user ? `<span class="user-badge" title="选择者">${user}</span>` : ''}
                 </div>
-                <select class="day-select ${selectedId ? 'selected' : ''}" onchange="saveDay(${idx}, this.value)" ${!isAuth ? 'disabled' : ''}>
-                    ${extraOption}${options}
-                </select>
+                <div class="day-select-wrapper">
+                    <div class="custom-select-wrapper">
+                        <input type="text" class="custom-select-input" 
+                            placeholder="选择或输入..." 
+                            value="${selectedName || ''}" 
+                            onfocus="openDropdown(${idx})"
+                            onblur="handleInputBlur(${idx})"
+                            onkeydown="handleInputKeydown(event, ${idx})"
+                            oninput="handleInputChange(${idx}, this.value)"
+                            ${!isAuth ? 'disabled' : ''}>
+                        <div class="custom-select-arrow" onclick="toggleDropdown(${idx})">▼</div>
+                        <div class="custom-select-dropdown" id="dropdown-${idx}">
+                            <div class="custom-select-option" data-value="" onclick="selectOption(${idx}, '', '')">— 未选择 —</div>
+                            ${Object.entries(menu).map(([id, name]) => 
+                                `<div class="custom-select-option ${selectedId == id ? 'selected' : ''}" data-value="${id}" onclick="selectOption(${idx}, '${id}', '${name.replace(/'/g, "\\'")}')">${name}</div>`
+                            ).join('')}
+                        </div>
+                    </div>
+                </div>
                 <button class="btn-random-day" onclick="randomDay(${idx})" title="随机" ${!isAuth ? 'disabled' : ''}>🎲</button>
                 <button class="btn-milk-tea ${hasMilkTea ? 'active' : ''}" onclick="toggleMilkTea(${idx})" title="${hasMilkTea ? '已喝奶茶' : '喝奶茶了吗？'}" ${!isAuth ? 'disabled' : ''}>🧋</button>
             </div>
@@ -520,6 +510,179 @@ function renderWeek() {
     document.querySelectorAll('.actions button').forEach(btn => btn.disabled = !isAuth);
     const userInp = document.getElementById('user-name');
     if (userInp && !userInp.value) userInp.value = userName;
+    
+    // 点击外部关闭下拉菜单
+    document.addEventListener('click', handleOutsideClick);
+}
+
+let openDropdownIndex = null;
+let inputTimeout = null;
+
+function toggleDropdown(dayIndex) {
+    const dropdown = document.getElementById(`dropdown-${dayIndex}`);
+    const isOpen = dropdown.classList.contains('open');
+    
+    // 先关闭所有下拉菜单
+    closeAllDropdowns();
+    
+    if (!isOpen) {
+        dropdown.classList.add('open');
+        openDropdownIndex = dayIndex;
+    }
+}
+
+function openDropdown(dayIndex) {
+    closeAllDropdowns();
+    const dropdown = document.getElementById(`dropdown-${dayIndex}`);
+    dropdown.classList.add('open');
+    openDropdownIndex = dayIndex;
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.custom-select-dropdown').forEach(d => d.classList.remove('open'));
+    openDropdownIndex = null;
+}
+
+function handleOutsideClick(event) {
+    if (!event.target.closest('.custom-select-wrapper')) {
+        closeAllDropdowns();
+    }
+}
+
+function selectOption(dayIndex, id, name) {
+    if (!isUserAuthorized()) {
+        alert('抱歉，只有指定用户可以操作！');
+        renderWeek();
+        return;
+    }
+    
+    const existingMilkTea = weekData[dayIndex]?.hasMilkTea || false;
+    const existingUser = weekData[dayIndex]?.user || null;
+    
+    if (id) {
+        weekData[dayIndex] = { 
+            id: parseInt(id), 
+            name: name, 
+            user: userName || existingUser,
+            hasMilkTea: existingMilkTea
+        };
+    } else {
+        if (existingMilkTea) {
+            weekData[dayIndex] = { 
+                id: null, 
+                name: null, 
+                user: existingUser,
+                hasMilkTea: existingMilkTea
+            };
+        } else {
+            weekData[dayIndex] = null;
+        }
+    }
+    
+    renderWeek();
+    saveToCloud();
+}
+
+function handleInputKeydown(event, dayIndex) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const input = event.target;
+        saveInputValue(dayIndex, input.value);
+        closeAllDropdowns();
+    } else if (event.key === 'Escape') {
+        closeAllDropdowns();
+        event.target.blur();
+    } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        openDropdown(dayIndex);
+        // 可以添加键盘导航逻辑
+    }
+}
+
+function handleInputChange(dayIndex, value) {
+    // 清除之前的超时
+    if (inputTimeout) {
+        clearTimeout(inputTimeout);
+    }
+    
+    // 打开下拉菜单
+    openDropdown(dayIndex);
+    
+    // 设置新的超时，延迟保存
+    inputTimeout = setTimeout(() => {
+        // 不自动保存，只在回车或失去焦点时保存
+    }, 500);
+}
+
+function handleInputBlur(dayIndex) {
+    setTimeout(() => {
+        const dayRow = document.querySelector(`.day-row[data-day="${dayIndex}"]`);
+        const input = dayRow.querySelector('.custom-select-input');
+        saveInputValue(dayIndex, input.value);
+    }, 150); // 延迟，让点击选项有时间生效
+}
+
+async function saveInputValue(dayIndex, value) {
+    const trimmedValue = value.trim();
+    
+    if (!trimmedValue) {
+        // 检查是否有奶茶记录需要保留
+        const entry = weekData[dayIndex];
+        if (entry && entry.hasMilkTea) {
+            weekData[dayIndex] = {
+                id: null,
+                name: null,
+                user: entry.user,
+                hasMilkTea: true
+            };
+        } else {
+            weekData[dayIndex] = null;
+        }
+        renderWeek();
+        await saveToCloud();
+        return;
+    }
+    
+    if (!isUserAuthorized()) {
+        alert('抱歉，只有指定用户可以操作！');
+        renderWeek();
+        return;
+    }
+    
+    // 检查是否是菜单中的选项
+    let matchedId = null;
+    let matchedName = null;
+    for (const [id, name] of Object.entries(menu)) {
+        if (name === trimmedValue) {
+            matchedId = id;
+            matchedName = name;
+            break;
+        }
+    }
+    
+    const existingMilkTea = weekData[dayIndex]?.hasMilkTea || false;
+    const existingUser = weekData[dayIndex]?.user || null;
+    
+    if (matchedId) {
+        // 是菜单中的选项
+        weekData[dayIndex] = {
+            id: parseInt(matchedId),
+            name: matchedName,
+            user: userName || existingUser,
+            hasMilkTea: existingMilkTea
+        };
+    } else {
+        // 临时输入
+        weekData[dayIndex] = {
+            id: null,
+            name: trimmedValue,
+            user: userName || existingUser,
+            hasMilkTea: existingMilkTea
+        };
+    }
+    
+    renderWeek();
+    await saveToCloud();
 }
 
 // 初始化执行
