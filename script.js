@@ -27,7 +27,7 @@ if (SUPABASE_CONFIG.URL !== 'YOUR_SUPABASE_URL' && SUPABASE_CONFIG.URL.trim() !=
 }
 
 // 菜单列表
-let menu = JSON.parse(localStorage.getItem('menuData')) || {
+let menu = {
     1: "米村",
     2: "炒粉",
     3: "米线",
@@ -40,10 +40,11 @@ let menu = JSON.parse(localStorage.getItem('menuData')) || {
 const dayNames = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六' };
 const ALLOWED_USERS = ['gina', 'pin'];
 
-// 周数据
-let weekData = JSON.parse(localStorage.getItem('weekData')) || { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
-let currentRecordId = localStorage.getItem('currentRecordId') || null;
-let userName = localStorage.getItem('userName') || '';
+// 周数据 - 只在内存中存储
+let weekData = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+let currentRecordId = null;
+let userName = localStorage.getItem('userName') || ''; // 用户名还是保留在本地
+let isLoading = false; // 加载状态
 
 // --- 日期工具函数 ---
 
@@ -94,7 +95,7 @@ function isUserAuthorized() {
 
 function saveUserName(name) {
     userName = name.trim();
-    localStorage.setItem('userName', userName);
+    localStorage.setItem('userName', userName); // 用户名还是保留在本地
     renderWeek();
 }
 
@@ -106,6 +107,16 @@ function updateStatusUI(connected) {
     }
 }
 
+// 加载状态 - 只是标记，不影响UI
+function setLoading(loading) {
+    isLoading = loading;
+}
+
+// 检查是否正在加载
+function checkLoading() {
+    return isLoading; // 只是返回状态，不显示alert了
+}
+
 async function fetchMenuData() {
     if (!isCloudConnected || !supabaseClient) return;
     try {
@@ -113,27 +124,20 @@ async function fetchMenuData() {
             .from('configs')
             .select('value')
             .eq('key', 'menu_data')
-            .maybeSingle(); // 使用 maybeSingle 替代 single，避免 406 错误
+            .maybeSingle();
         
         if (error) throw error;
         
         if (data && data.value) {
             menu = data.value;
-            localStorage.setItem('menuData', JSON.stringify(menu));
             renderWeek();
         }
     } catch (error) {
-        // 如果是表不存在的错误，静默失败，使用默认菜单
-        if (error.code === '42P01') {
-            console.warn('configs 表不存在，将使用本地默认菜单');
-        } else {
-            console.error('获取菜单失败:', error);
-        }
+        console.error('获取菜单失败:', error);
     }
 }
 
 async function saveMenuToCloud() {
-    localStorage.setItem('menuData', JSON.stringify(menu));
     if (!isCloudConnected || !supabaseClient) return;
     try {
         await supabaseClient.from('configs').upsert({ key: 'menu_data', value: menu });
@@ -150,11 +154,29 @@ function toLocalDateString(date) {
     return `${year}-${month}-${day}`;
 }
 
-// 修改：根据本周一的日期获取数据
-async function fetchCloudData() {
-    if (!isCloudConnected || !supabaseClient) return;
+// 获取某日期所在周的周一
+function getMondayOfDate(dateInput) {
+    const date = new Date(dateInput);
+    const day = date.getDay() || 7;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - (day - 1));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+}
 
+let isFirstLoad = true;
+
+// 根据本周一的日期获取数据 - 简化版
+async function fetchCloudData(showLoading = false) {
+    if (!isCloudConnected || !supabaseClient) {
+        return;
+    }
+
+    if (showLoading) {
+        setLoading(true);
+    }
     const mondayStr = toLocalDateString(getThisMonday());
+    console.log('正在获取周数据，本周一:', mondayStr);
 
     try {
         const { data, error } = await supabaseClient
@@ -163,35 +185,29 @@ async function fetchCloudData() {
             .eq('week_monday', mondayStr)
             .limit(1);
 
-        // 如果报错是因为字段不存在，我们需要提醒用户
-        if (error) {
-            if (error.code === '42703') {
-                console.error('数据库缺少 week_monday 字段，请运行 SQL 迁移脚本！');
-            }
-            throw error;
-        }
+        if (error) throw error;
 
         if (data && data.length > 0) {
             const plan = data[0];
             weekData = plan.data;
             currentRecordId = plan.id;
-            localStorage.setItem('weekData', JSON.stringify(weekData));
-            localStorage.setItem('currentRecordId', currentRecordId);
+            console.log('成功加载本周数据');
             renderWeek();
             updateStatusUI(true);
         } else {
-            // 如果本周确实没记录，且当前 ID 是旧的，才清空
-            if (currentRecordId) {
-                console.log('检测到新的一周，正在切换到空白计划');
-                weekData = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
-                currentRecordId = null;
-                localStorage.removeItem('currentRecordId');
-                renderWeek();
-            }
+            console.log('本周没有记录，初始化空白计划');
+            weekData = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+            currentRecordId = null;
+            renderWeek();
         }
     } catch (error) {
         console.error('获取云端数据失败:', error);
         updateStatusUI(false);
+    } finally {
+        if (showLoading) {
+            setLoading(false);
+        }
+        isFirstLoad = false;
     }
 }
 
@@ -204,7 +220,7 @@ async function saveToCloud() {
         let result;
         const payload = { 
             data: weekData, 
-            week_monday: mondayStr // 关键：保存本周一的日期
+            week_monday: mondayStr
         };
 
         if (currentRecordId) {
@@ -232,6 +248,7 @@ async function saveToCloud() {
 
 // 切换奶茶状态
 async function toggleMilkTea(dayIndex) {
+    if (checkLoading()) return; // 加载中不操作
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
         renderWeek();
@@ -246,16 +263,15 @@ async function toggleMilkTea(dayIndex) {
     await saveToCloud();
 }
 
-// 兼容旧代码，实际使用新的 saveInputValue
-
 // 随机某天
 async function randomDay(dayIndex) {
+    if (checkLoading()) return;
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
         return;
     }
     const usedIds = Object.entries(weekData)
-        .filter(([d, val]) => parseInt(d) !== dayIndex && val !== null)
+        .filter(([d, val]) => parseInt(d) !== dayIndex && val !== null && val.id !== null)
         .map(([, val]) => val.id);
 
     const available = Object.keys(menu)
@@ -269,7 +285,7 @@ async function randomDay(dayIndex) {
 
     const selectedId = available[Math.floor(Math.random() * available.length)];
     const existingMilkTea = weekData[dayIndex]?.hasMilkTea || false;
-    // 关键改进：存储时同时保存名称和奶茶状态
+    
     weekData[dayIndex] = { 
         id: selectedId, 
         name: menu[selectedId], 
@@ -281,6 +297,7 @@ async function randomDay(dayIndex) {
 }
 
 function pickToday() {
+    if (checkLoading()) return;
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
         return;
@@ -293,8 +310,9 @@ function pickToday() {
     randomDay(today);
 }
 
-// 修改：重置本周
+// 重置本周
 async function newWeek() {
+    if (checkLoading()) return;
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
         return;
@@ -326,19 +344,8 @@ function switchTab(tabName) {
     if (tabName === 'menu') renderMenuEditor();
 }
 
-// 获取某日期所在周的周一
-function getMondayOfDate(dateInput) {
-    const date = new Date(dateInput);
-    const day = date.getDay() || 7;
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - (day - 1));
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-}
-
 // 历史记录中的日期范围工具
 function getWeekRangeString(dateStr, weekMonday) {
-    // 优先使用数据库里存的 week_monday，如果没有（旧数据），则实时推算
     const monday = weekMonday ? new Date(weekMonday) : getMondayOfDate(dateStr);
     const saturday = new Date(monday);
     saturday.setDate(monday.getDate() + 5);
@@ -356,7 +363,6 @@ async function loadHistory() {
         const { data, error } = await supabaseClient
             .from('week_plans')
             .select('*')
-            // 优先按 week_monday 排序，如果没有则按创建时间
             .order('week_monday', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false });
 
@@ -370,14 +376,12 @@ async function loadHistory() {
         const stats = {};
 
         data.forEach(record => {
-            // 统一使用周一日期作为分组和显示的基准
             const mondayDate = record.week_monday ? new Date(record.week_monday) : getMondayOfDate(record.created_at);
             const monthKey = `${mondayDate.getFullYear()}年${mondayDate.getMonth() + 1}月`;
             
             if (!months[monthKey]) months[monthKey] = [];
             months[monthKey].push({ ...record, calculated_monday: mondayDate });
 
-            // 统计逻辑
             Object.values(record.data).forEach(entry => {
                 if (entry) {
                     const foodName = entry.name || (entry.id && menu[entry.id]) || "未知食物";
@@ -393,7 +397,6 @@ async function loadHistory() {
                 const details = Object.entries(dayNames).map(([idx, name]) => {
                     const entry = record.data[idx];
                     if (!entry) return '';
-                    // 即使菜单里删了，也能从记录里读出名字
                     const foodName = entry.name || (entry.id && menu[entry.id]) || "未知";
                     const milkTeaEmoji = entry.hasMilkTea ? ' 🧋' : '';
                     const customLabel = entry.id === null ? ' ✏️' : '';
@@ -459,7 +462,7 @@ async function deleteMenuItem(id) {
 window.onclick = (event) => {
     const modal = document.getElementById('history-modal');
     if (event.target == modal) modal.style.display = 'none';
-}
+};
 
 function renderWeek() {
     const today = getTodayIndex();
@@ -511,7 +514,6 @@ function renderWeek() {
     const userInp = document.getElementById('user-name');
     if (userInp && !userInp.value) userInp.value = userName;
     
-    // 点击外部关闭下拉菜单
     document.addEventListener('click', handleOutsideClick);
 }
 
@@ -522,7 +524,6 @@ function toggleDropdown(dayIndex) {
     const dropdown = document.getElementById(`dropdown-${dayIndex}`);
     const isOpen = dropdown.classList.contains('open');
     
-    // 先关闭所有下拉菜单
     closeAllDropdowns();
     
     if (!isOpen) {
@@ -550,6 +551,7 @@ function handleOutsideClick(event) {
 }
 
 function selectOption(dayIndex, id, name) {
+    if (checkLoading()) return;
     if (!isUserAuthorized()) {
         alert('抱歉，只有指定用户可以操作！');
         renderWeek();
@@ -595,23 +597,14 @@ function handleInputKeydown(event, dayIndex) {
     } else if (event.key === 'ArrowDown') {
         event.preventDefault();
         openDropdown(dayIndex);
-        // 可以添加键盘导航逻辑
     }
 }
 
 function handleInputChange(dayIndex, value) {
-    // 清除之前的超时
     if (inputTimeout) {
         clearTimeout(inputTimeout);
     }
-    
-    // 打开下拉菜单
     openDropdown(dayIndex);
-    
-    // 设置新的超时，延迟保存
-    inputTimeout = setTimeout(() => {
-        // 不自动保存，只在回车或失去焦点时保存
-    }, 500);
 }
 
 function handleInputBlur(dayIndex) {
@@ -619,14 +612,14 @@ function handleInputBlur(dayIndex) {
         const dayRow = document.querySelector(`.day-row[data-day="${dayIndex}"]`);
         const input = dayRow.querySelector('.custom-select-input');
         saveInputValue(dayIndex, input.value);
-    }, 150); // 延迟，让点击选项有时间生效
+    }, 150);
 }
 
 async function saveInputValue(dayIndex, value) {
+    if (checkLoading()) return;
     const trimmedValue = value.trim();
     
     if (!trimmedValue) {
-        // 检查是否有奶茶记录需要保留
         const entry = weekData[dayIndex];
         if (entry && entry.hasMilkTea) {
             weekData[dayIndex] = {
@@ -649,7 +642,6 @@ async function saveInputValue(dayIndex, value) {
         return;
     }
     
-    // 检查是否是菜单中的选项
     let matchedId = null;
     let matchedName = null;
     for (const [id, name] of Object.entries(menu)) {
@@ -664,7 +656,6 @@ async function saveInputValue(dayIndex, value) {
     const existingUser = weekData[dayIndex]?.user || null;
     
     if (matchedId) {
-        // 是菜单中的选项
         weekData[dayIndex] = {
             id: parseInt(matchedId),
             name: matchedName,
@@ -672,7 +663,6 @@ async function saveInputValue(dayIndex, value) {
             hasMilkTea: existingMilkTea
         };
     } else {
-        // 临时输入
         weekData[dayIndex] = {
             id: null,
             name: trimmedValue,
@@ -688,13 +678,21 @@ async function saveInputValue(dayIndex, value) {
 // 初始化执行
 updateDateDisplay();
 updateStatusUI(isCloudConnected);
+
+// 初始渲染 - 先显示空白的
+weekData = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+currentRecordId = null;
 renderWeek();
 
 if (isCloudConnected) {
     (async () => {
-        await fetchMenuData();
-        await fetchCloudData();
+        setLoading(true);
+        try {
+            await fetchMenuData();
+            await fetchCloudData(false);
+        } finally {
+            setLoading(false);
+        }
     })();
-    setInterval(fetchMenuData, 15000);
-    setInterval(fetchCloudData, 30000);
+    // 移除定时刷新，只在初始化时加载一次
 }

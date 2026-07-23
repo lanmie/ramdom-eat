@@ -622,3 +622,19 @@ h1 {
     background: #f0f0f0;
     border-color: #eee;
 }
+
+/* 修复历史数据按钮 */
+.btn-fix-history {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-fix-history:hover {
+    background: #c0392b;
+}
